@@ -1,5 +1,5 @@
-import network, socket
-from machine import Pin, Timer
+import network, socket, utime
+from machine import Pin
 from tp3_util import * #Fichier avec fonctions pour le code
 
 """********************* Configuration GPIO **********************"""
@@ -11,15 +11,6 @@ led.value(True)       #Mise de la led à l'état bas
 wlan = network.WLAN(network.STA_IF)
 #Activation du WiFi
 wlan.active(True)
-
-"""********************* Configuration Timer **********************"""
-#Création d'un objet Timer
-timer = Timer(0)
-new_data_submission = False
-#Fonction d'interruption du Timer
-def new_data_to_be_send(timer):
-    global new_data_submission
-    new_data_submission = True
         
 """************************ Main program **************************"""
 #Connexion au WiFi
@@ -38,27 +29,29 @@ except Exception as e:
     print("An exception occurred:", e)
 else:
     sockets_connected = True
-    #Initialisation de la fréquence d'interruption du timer (en Hz)
-    timer.init(freq=50, mode=Timer.PERIODIC, callback=new_data_to_be_send)
 
 
 #Boucle d'envoie des données
+start_time = utime.ticks_ms() #Récupération du temps de départ
 n = 1
-while n <= 40 and sockets_connected == True :
-    if new_data_submission == True:
-        data = '%s\n' % (str(n))
+while n <= 20 and sockets_connected == True :
+    #Comparaison temps actuel et du temps de départ
+    if utime.ticks_diff(utime.ticks_ms(),start_time)>=20: #50Hz
         try:
+            #Écriture de la donnée qui ser envoyée
+            data = '%d\n' % n
             #Envoie des données successivement via TCP puis UDP
-            tcp_socket.send(bytes(data, 'utf8'))
-            udp_socket.send(bytes(data, 'utf8'))
+            tcp_socket.send(data.encode())
+            udp_socket.send(data.encode())
         except Exception as e:
             print("An exception occurred :", e)
             break
         else:
+            #Incrémentation de la variable envoyée
             n=n+1
-            data = ""
-            new_data_submission = False
+            #Récupération du nouveau temps initial
+            start_time = utime.ticks_ms()
 
-#Fermeture des sockets      
+#Fermeture des sockets
 tcp_socket.close()
 udp_socket.close()
